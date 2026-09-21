@@ -65,9 +65,6 @@ class SwarmEnv(ParallelEnv):
         self.visited_cells: set[tuple[int, int, int]] = set()
         self.np_random: np.random.Generator = np.random.default_rng()
 
-    # ------------------------------------------------------------------ #
-    # PettingZoo required space accessors (cached per agent id)
-    # ------------------------------------------------------------------ #
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
         return self._observation_spaces[agent]
@@ -116,9 +113,6 @@ class SwarmEnv(ParallelEnv):
         infos = {agent: {} for agent in self.agents}
         return observations, infos
 
-    # ------------------------------------------------------------------ #
-    # Core loop: step()
-    # ------------------------------------------------------------------ #
     def step(self, actions: dict):
     
         if not self.agents:
@@ -190,9 +184,6 @@ class SwarmEnv(ParallelEnv):
 
         return observations, rewards, terminations, truncations, infos
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
     def _get_observation(self, agent: str) -> np.ndarray:
         own_pos = self.positions[agent]
         own_vel = self.velocities[agent]
