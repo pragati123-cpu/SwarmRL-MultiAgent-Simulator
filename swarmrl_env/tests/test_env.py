@@ -112,7 +112,7 @@ def test_collision_triggers_large_negative_reward():
     env = make_env(n_agents=2, collision_radius=1000.0, max_speed=0.0)
     env.reset(seed=5)
 
-    actions = {agent: np.zeros(3, dtype=np.float32) for agent in env.agents}
+    actions = {agent: np.zeros(4, dtype=np.float32) for agent in env.agents}
     _, rewards, _, _, infos = env.step(actions)
 
     assert all(infos[agent]["collided"] for agent in env.possible_agents)
@@ -123,7 +123,7 @@ def test_exploration_reward_given_once_per_cell():
     env = make_env(n_agents=2, grid_cell_size=1000.0, max_speed=0.0)
     env.reset(seed=9)
 
-    actions = {agent: np.zeros(3, dtype=np.float32) for agent in env.agents}
+    actions = {agent: np.zeros(4, dtype=np.float32) for agent in env.agents}
 
     # First step in a fresh (huge) cell area away from spawn cells that
     # were pre-marked visited during reset: use a tiny nonzero throttle
@@ -151,6 +151,26 @@ def test_step_after_episode_end_is_safe_noop():
     assert terminations == {}
     assert truncations == {}
     assert infos == {}
+
+
+def test_action_space_defines_velocity_pitch_yaw_and_roll():
+    env = make_env(n_agents=2)
+
+    for agent in env.possible_agents:
+        space = env.action_space(agent)
+
+        assert space.shape == (4,)
+        np.testing.assert_array_equal(
+            space.low,
+            np.array([0.0, -1.0, -1.0, -1.0], dtype=np.float32),
+        )
+        np.testing.assert_array_equal(
+            space.high,
+            np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+        )
+        assert space.contains(np.array([0.5, 0.0, 0.0, 0.0], dtype=np.float32))
+        assert not space.contains(np.array([-0.1, 0.0, 0.0, 0.0], dtype=np.float32))
+        assert not space.contains(np.zeros(3, dtype=np.float32))
 
 
 if __name__ == "__main__":

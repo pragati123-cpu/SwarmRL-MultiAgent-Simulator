@@ -16,6 +16,9 @@ class SwarmEnv(ParallelEnv):
         "render_modes": ["human", None],
     }
 
+    _ACTION_LOW = np.array([0.0, -1.0, -1.0, -1.0], dtype=np.float32)
+    _ACTION_HIGH = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+
     def __init__(
         self,
         n_agents: int = 50,
@@ -47,7 +50,11 @@ class SwarmEnv(ParallelEnv):
         self._obs_dim = 3 + 3 + 3 * self.n_neighbors + 6
 
         self._action_spaces = {
-            agent: spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
+            agent: spaces.Box(
+                low=self._ACTION_LOW,
+                high=self._ACTION_HIGH,
+                dtype=np.float32,
+            )
             for agent in self.possible_agents
         }
         self._observation_spaces = {
@@ -127,10 +134,10 @@ class SwarmEnv(ParallelEnv):
                 self.velocities[agent] = np.zeros(3, dtype=np.float32)
                 continue
 
-            action = np.clip(np.asarray(actions[agent], dtype=np.float32), -1.0, 1.0)
-            throttle_cmd, pitch_cmd, yaw_cmd = action
+            action = np.asarray(actions[agent], dtype=np.float32)
+            velocity_cmd, pitch_cmd, yaw_cmd, _roll_cmd = action
 
-            speed = (throttle_cmd + 1.0) / 2.0 * self.max_speed  # [0, max_speed]
+            speed = velocity_cmd * self.max_speed  # [0, max_speed]
             pitch = pitch_cmd * (np.pi / 2.0)  # [-pi/2, pi/2]
             yaw = yaw_cmd * np.pi  # [-pi, pi]
 
