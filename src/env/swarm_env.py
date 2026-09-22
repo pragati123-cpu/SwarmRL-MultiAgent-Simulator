@@ -8,6 +8,9 @@ class SwarmEnv(ParallelEnv):
         "name": "swarmrl_v0"
     }
 
+    _ACTION_LOW = np.array([0.0, -1.0, -1.0, -1.0], dtype=np.float32)
+    _ACTION_HIGH = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+
     def __init__(self, num_drones=4):
         super().__init__()
 
@@ -20,23 +23,19 @@ class SwarmEnv(ParallelEnv):
 
         self.agents = self.possible_agents.copy()
 
-        # Continuous drone control:
-        # [velocity, pitch, yaw, roll]
-        self._action_space = spaces.Box(
-            low=np.array(
-                [0.0, -1.0, -1.0, -1.0],
+        # Each action is [velocity, pitch, yaw, roll].
+        self._action_spaces = {
+            agent: spaces.Box(
+                low=self._ACTION_LOW,
+                high=self._ACTION_HIGH,
                 dtype=np.float32
-            ),
-            high=np.array(
-                [1.0, 1.0, 1.0, 1.0],
-                dtype=np.float32
-            ),
-            dtype=np.float32
-        )
+            )
+            for agent in self.possible_agents
+        }
 
     def action_space(self, agent):
         """Return the continuous action space for a drone."""
-        return self._action_space
+        return self._action_spaces[agent]
 
     def reset(self, seed=None, options=None):
         """Reset the environment."""
