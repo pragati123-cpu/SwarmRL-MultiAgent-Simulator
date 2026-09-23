@@ -1,8 +1,20 @@
-# Week 2 - Task 2: Collision Penalty
+# Week 2 - Task 2: Collision Penalty and Exploration Reward
 
 ## Objective
 
-Implement a severe collision penalty for drones in the SwarmRL multi-agent simulator.
+Implement the collision penalty and coverage-based exploration reward used by
+the current SwarmRL multi-agent environment.
+
+## Exploration Reward
+
+The PettingZoo environment tracks visited 3D grid cells in
+`SwarmEnv.visited_cells`. A drone receives `+1` when its current cell has not
+been visited by any drone before; the cell is then added to the shared set.
+Revisiting a known cell returns `0` exploration reward. Spawn cells are marked
+visited during `reset()`.
+
+The grid resolution is configured with `grid_cell_size`, and the running
+unique-cell count is available as `infos[agent]["coverage_cells"]`.
 
 ## Collision Conditions
 
@@ -39,3 +51,4 @@ Else if drone collides with another drone:
 
 Else:
     Reward = 0
+```
