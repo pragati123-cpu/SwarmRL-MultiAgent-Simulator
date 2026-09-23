@@ -1,3 +1,4 @@
+# Core environment and continuous observation/action spaces.
 numpy>=1.24
 gymnasium>=0.29
 pettingzoo>=1.24

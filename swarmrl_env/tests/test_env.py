@@ -48,6 +48,7 @@ def test_reset_returns_all_agents_with_correct_shapes():
         obs = observations[agent]
         assert obs.shape == env.observation_space(agent).shape
         assert np.all(np.isfinite(obs))
+        assert env.observation_space(agent).contains(obs)
 
 
 def test_reset_is_deterministic_given_seed():
@@ -59,6 +60,23 @@ def test_reset_is_deterministic_given_seed():
 
     for agent in env_a.possible_agents:
         assert np.allclose(obs_a[agent], obs_b[agent])
+
+
+def test_observation_contains_sorted_nearest_distances_and_position():
+    env = make_env(n_agents=3, n_neighbors=2, world_size=20.0)
+    env.reset(seed=1)
+
+    env.positions = {
+        "drone_0": np.array([0.0, 0.0, 0.0], dtype=np.float32),
+        "drone_1": np.array([3.0, 0.0, 0.0], dtype=np.float32),
+        "drone_2": np.array([0.0, 4.0, 0.0], dtype=np.float32),
+    }
+    observation = env._get_observation("drone_0")
+
+    assert observation.shape == (env._obs_dim,)
+    np.testing.assert_allclose(observation[:3], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(observation[6:8], [3.0 / 20.0, 4.0 / 20.0])
+    assert env.observation_space("drone_0").contains(observation)
 
 
 def test_step_returns_expected_dict_shapes():

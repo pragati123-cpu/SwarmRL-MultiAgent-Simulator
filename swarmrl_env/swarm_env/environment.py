@@ -43,8 +43,25 @@ class SwarmEnv(ParallelEnv):
         self.grid_cell_size = float(grid_cell_size)
         self.render_mode = render_mode
 
-        # own pos(3) + own vel(3) + k neighbor relative positions(3k) + 6 wall distances
-        self._obs_dim = 3 + 3 + 3 * self.n_neighbors + 6
+        # own position(3) + own velocity(3) + k nearest-neighbor distances + 6 wall distances
+        self._obs_dim = 3 + 3 + self.n_neighbors + 6
+        max_neighbor_distance = np.sqrt(3.0)
+        observation_low = np.concatenate(
+            [
+                np.full(3, -1.0, dtype=np.float32),
+                np.full(3, -1.0, dtype=np.float32),
+                np.zeros(self.n_neighbors, dtype=np.float32),
+                np.zeros(6, dtype=np.float32),
+            ]
+        )
+        observation_high = np.concatenate(
+            [
+                np.ones(3, dtype=np.float32),
+                np.ones(3, dtype=np.float32),
+                np.full(self.n_neighbors, max_neighbor_distance, dtype=np.float32),
+                np.ones(6, dtype=np.float32),
+            ]
+        )
 
         self._action_spaces = {
             agent: spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
@@ -52,7 +69,9 @@ class SwarmEnv(ParallelEnv):
         }
         self._observation_spaces = {
             agent: spaces.Box(
-                low=-np.inf, high=np.inf, shape=(self._obs_dim,), dtype=np.float32
+                low=observation_low,
+                high=observation_high,
+                dtype=np.float32,
             )
             for agent in self.possible_agents
         }
@@ -188,7 +207,7 @@ class SwarmEnv(ParallelEnv):
         own_pos = self.positions[agent]
         own_vel = self.velocities[agent]
 
-        neighbor_rel_positions = self._nearest_neighbor_offsets(agent)
+        neighbor_distances = self._nearest_neighbor_distances(agent)
 
         # Distance to each of the 6 bounding walls, normalized to [0, 1].
         wall_distances = np.array(
@@ -207,7 +226,7 @@ class SwarmEnv(ParallelEnv):
             [
                 own_pos / self.half_size,
                 own_vel / max(self.max_speed, 1e-6),
-                neighbor_rel_positions / self.world_size,
+                neighbor_distances / self.world_size,
                 wall_distances,
             ]
         ).astype(np.float32)
@@ -215,27 +234,29 @@ class SwarmEnv(ParallelEnv):
         assert obs.shape[0] == self._obs_dim
         return obs
 
-    def _nearest_neighbor_offsets(self, agent: str) -> np.ndarray:
+    def _nearest_neighbor_distances(self, agent: str) -> np.ndarray:
 
         own_pos = self.positions[agent]
         others = [a for a in self.agents if a != agent]
 
         if not others:
-            return np.zeros(3 * self.n_neighbors, dtype=np.float32)
+            return np.zeros(self.n_neighbors, dtype=np.float32)
 
         other_positions = np.stack([self.positions[a] for a in others])
         deltas = other_positions - own_pos  # (num_others, 3)
-        dists = np.linalg.norm(deltas, axis=1)
+        distances = np.linalg.norm(deltas, axis=1)
 
         k = min(self.n_neighbors, len(others))
-        nearest_idx = np.argsort(dists)[:k]
-        nearest_deltas = deltas[nearest_idx]
+        nearest_distances = np.sort(distances)[:k]
 
         if k < self.n_neighbors:
-            pad = np.zeros((self.n_neighbors - k, 3), dtype=np.float32)
-            nearest_deltas = np.concatenate([nearest_deltas, pad], axis=0)
+            nearest_distances = np.pad(
+                nearest_distances,
+                (0, self.n_neighbors - k),
+                constant_values=0.0,
+            )
 
-        return nearest_deltas.flatten().astype(np.float32)
+        return nearest_distances.astype(np.float32)
 
     def _detect_collisions(self) -> set[str]:
         agents = self.agents
