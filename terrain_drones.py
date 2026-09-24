@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class DroneTerrainSimulation:
     def __init__(self, num_drones=50, grid_size=(30, 30)):
         self.num_drones = num_drones
@@ -22,7 +23,33 @@ class DroneTerrainSimulation:
             "drones": self.drones
         }
 
+    def get_realtime_position_payload(self):
+        """
+        Formats real-time X, Y, Z coordinates and active status 
+        of all 50 drones into a JSON streaming payload.
+        """
+        return {
+            "status": "streaming",
+            "drone_count": len(self.drones),
+            "payload": [
+                {
+                    "id": drone["id"],
+                    "position": {
+                        "x": float(drone["position"][0]),
+                        "y": float(drone["position"][1]),
+                        "z": float(drone["position"][2])
+                    },
+                    "status": "active"
+                }
+                for drone in self.drones
+            ]
+        }
+
+
 if __name__ == "__main__":
     sim = DroneTerrainSimulation()
     state = sim.get_simulation_state()
     print(f"Initialized 3D Terrain with {len(state['drones'])} dummy drones.")
+
+    payload = sim.get_realtime_position_payload()
+    print(f"Streaming Payload Sample (Drone 0): {payload['payload'][0]}")
