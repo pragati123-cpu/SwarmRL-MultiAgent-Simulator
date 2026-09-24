@@ -157,6 +157,27 @@ def test_exploration_reward_given_once_per_cell():
         assert rewards_second[agent] <= 0.0
 
 
+def test_exploration_reward_is_one_for_a_new_cell():
+    env = make_env(n_agents=2, grid_cell_size=1.0, max_speed=2.0)
+    env.reset(seed=9)
+
+    first_agent, second_agent = env.agents
+    env.positions[first_agent] = np.array([0.1, 0.1, 0.1], dtype=np.float32)
+    env.positions[second_agent] = np.array([8.0, 8.0, 8.0], dtype=np.float32)
+    env.visited_cells = {
+        env._position_to_cell(env.positions[first_agent]),
+        env._position_to_cell(env.positions[second_agent]),
+    }
+
+    actions = {
+        first_agent: np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        second_agent: np.zeros(3, dtype=np.float32),
+    }
+    _, rewards, _, _, _ = env.step(actions)
+
+    assert rewards[first_agent] == 1.0
+
+
 def test_step_after_episode_end_is_safe_noop():
     env = make_env(max_episode_steps=1)
     env.reset(seed=11)

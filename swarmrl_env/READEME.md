@@ -1,14 +1,15 @@
-# SwarmRL — Week 1: Environment Reset & Step Logic
+# SwarmRL - Environment Reset, Step, and Reward Logic
 
 **Project:** SwarmRL — Multi-Agent Deep Reinforcement Learning Simulator
 **Track:** Reinforcement Learning (Ray RLlib, PyTorch)
 **This deliverable's scope:** `Environment Reset & Step Logic (Python/PettingZoo)` —
-standard `reset()` and `step()` handlers for the multi-agent environment loop.
+standard `reset()` and `step()` handlers for the multi-agent environment loop,
+including observation, collision, and exploration-reward behavior.
 
 This repo implements the piece of Week 1 ("Environment Physics") assigned to
 this task: a working `reset()`/`step()` loop for the custom PettingZoo
-environment, including the continuous action space (velocity / pitch / yaw),
-the "distance to nearest neighbors" observation, boundary clipping, collision
+environment, including the continuous action space (throttle / pitch / yaw),
+the sorted distances to nearest neighbors observation, boundary clipping, collision
 detection, and the coverage-based reward. It does **not** cover the
 Three.js/WebSocket rendering track (that's the parallel "Simulation &
 Rendering" column for Week 1) or the RLlib training loop (Week 3) — those are
@@ -20,7 +21,7 @@ separate teammates' deliverables that will import this environment.
 
 ```
 swarmrl_env/
-├── README.md
+├── READEME.md
 ├── requirements.txt
 ├── demo.py                    # random-action rollout smoke test
 ├── swarm_env/
@@ -41,12 +42,12 @@ pip install -r requirements.txt
 
 ```bash
 python demo.py              # random rollout, prints per-step stats
-python -m pytest tests/ -v  # correctness tests (8 tests, all passing)
+python -m pytest tests/ -v  # correctness tests (10 tests)
 ```
 
-Both have been run against this code already: the demo completes a full
-episode cleanly, the pytest suite passes 8/8, and the environment also passes
-PettingZoo's own `pettingzoo.test.parallel_api_test` compliance checker.
+The test suite covers reset determinism, bounded positions, observation-space
+validity, collision penalties, exploration rewards, episode truncation, and
+safe stepping after an episode ends.
 
 ---
 
@@ -57,7 +58,7 @@ PettingZoo's own `pettingzoo.test.parallel_api_test` compliance checker.
 is the API RLlib's multi-agent trainers expect, and what the Ray RLlib track
 will consume in Week 3).
 
-### Action space — per agent, `Box(low=-1, high=1, shape=(3,))`
+### Action space - per agent, `Box(low=-1, high=1, shape=(3,))`
 
 | Index | Meaning       | Mapped range              |
 |-------|---------------|----------------------------|
@@ -69,7 +70,7 @@ will consume in Week 3).
 standard spherical→cartesian conversion, then integrates position by one
 step and clips it to the world's bounding box.
 
-### Observation space — per agent, `Box(shape=(6 + 3k + 6,))`
+### Observation space - per agent, `Box(shape=(6 + k + 6,))`
 
 For `n_neighbors=k` (default 5):
 
@@ -77,7 +78,7 @@ For `n_neighbors=k` (default 5):
 |-----------------------------|------|---------------------------------------------------|
 | Own position (normalized)  | 3    | position / half world-size                        |
 | Own velocity (normalized)  | 3    | velocity / max_speed                               |
-| Nearest-neighbor offsets   | 3k   | `(dx, dy, dz)` to the k closest other agents       |
+| Nearest-neighbor distances | k    | sorted distances to the k closest other agents    |
 | Wall distances             | 6    | normalized distance to each of the 6 bounding walls|
 
 Nearest neighbors are recomputed each step by brute-force pairwise distance

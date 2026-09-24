@@ -170,11 +170,7 @@ class SwarmEnv(ParallelEnv):
         # 3) Rewards: exploration bonus + collision penalty.
         rewards = {}
         for agent in self.agents:
-            reward = 0.0
-            cell = self._position_to_cell(self.positions[agent])
-            if cell not in self.visited_cells:
-                self.visited_cells.add(cell)
-                reward += 1.0
+            reward = self._exploration_reward(agent)
             if agent in collided_agents:
                 reward -= 100.0
             rewards[agent] = float(reward)
@@ -276,6 +272,15 @@ class SwarmEnv(ParallelEnv):
     def _position_to_cell(self, position: np.ndarray) -> tuple[int, int, int]:
         cell = np.floor(position / self.grid_cell_size).astype(int)
         return int(cell[0]), int(cell[1]), int(cell[2])
+
+    def _exploration_reward(self, agent: str) -> float:
+        """Return 1 for a newly visited cell and 0 for a known cell."""
+        cell = self._position_to_cell(self.positions[agent])
+        if cell in self.visited_cells:
+            return 0.0
+
+        self.visited_cells.add(cell)
+        return 1.0
 
     # ------------------------------------------------------------------ #
     # Misc PettingZoo API
