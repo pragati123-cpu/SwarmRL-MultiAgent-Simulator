@@ -51,3 +51,8 @@ def test_boundary_inside():
     position = (50, 50, 50)
 
     assert is_outside_boundary(position) is False
+    
+def test_boundary_edge_position_is_valid():
+    position = (100, 100, 100)
+
+    assert is_outside_boundary(position) is False
