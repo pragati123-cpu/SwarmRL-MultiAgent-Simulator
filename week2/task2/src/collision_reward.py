@@ -9,8 +9,12 @@ SPACE_BOUNDS = {
     "z": (0.0, 100.0),
 }
 
-COLLISION_DISTANCE = 2.0
+COLLISION_DISTANCE = 2.0  
+# Severe penalty applied when a drone collides or leaves the environment.
+COLLISION_PENALTY = -100
 
+# Minimum distance between drones before a collision is detected.
+COLLISION_DISTANCE = 2.0
 
 def calculate_distance(position_a, position_b):
     """Calculate Euclidean distance between two 3D positions."""
