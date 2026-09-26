@@ -40,10 +40,14 @@ The number of nearest-drone distances is controlled by `n_neighbors`. The
 observation space is a Gymnasium `Box` and is exposed per agent through the
 PettingZoo `ParallelEnv` API.
 
-Each drone receives `+1` the first time it enters a previously unvisited 3D
-grid cell. Revisiting a visited cell gives no exploration bonus. The grid
-resolution is controlled by `grid_cell_size`, and spawn cells are marked as
-visited during reset. Collision steps apply a `-100` penalty, and
+The reward balances coverage, safe spacing, and collision avoidance. A drone
+receives `+1` the first time it enters a previously unvisited 3D grid cell
+(spawn cells are already marked visited), plus a separation score from `0` to
+`0.5` based on its distance to the nearest other drone. That score reaches its
+maximum at `target_separation` (default: twice `collision_radius`). A collision
+adds `-10`, which outweighs the maximum positive reward of `+1.5`. The weights
+and collision penalty can be configured on `SwarmEnv`. Per-agent info includes
+the `coverage`, `separation`, and `collision` reward components, and
 `infos[agent]["coverage_cells"]` reports the running number of unique cells.
 
 Run the backend tests from the repository root:

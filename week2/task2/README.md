@@ -2,8 +2,15 @@
 
 ## Objective
 
-Implement the collision penalty and coverage-based exploration reward used by
-the current SwarmRL multi-agent environment.
+This folder contains a standalone collision/boundary penalty helper. It is not
+called by the integrated PettingZoo environment, whose combined coverage,
+separation, and collision reward is implemented in
+`swarmrl_env/swarm_env/environment.py`.
+
+The integrated environment awards `+1.0` for a newly visited cell, up to
+`+0.5` for separation from the nearest drone, and applies `-10.0` for a
+collision. Its reward weights and target separation are configurable; see
+`swarmrl_env/READEME.md` for the full formula and per-agent reward breakdown.
 
 ## Exploration Reward
 
@@ -18,7 +25,7 @@ unique-cell count is available as `infos[agent]["coverage_cells"]`.
 
 ## Collision Conditions
 
-A drone receives a penalty of **-100** when:
+A caller of the standalone helper receives a penalty of **-100** when:
 
 1. It collides with another drone.
 2. It moves outside the 3D environment boundary.

@@ -25,6 +25,10 @@ class SwarmEnv(ParallelEnv):
         collision_radius: float = 1.5,
         max_speed: float = 2.0,
         grid_cell_size: float = 5.0,
+        target_separation: Optional[float] = None,
+        coverage_weight: float = 1.0,
+        separation_weight: float = 0.5,
+        collision_penalty: float = 10.0,
         render_mode: Optional[str] = None,
     ):
 
@@ -41,6 +45,20 @@ class SwarmEnv(ParallelEnv):
         self.collision_radius = float(collision_radius)
         self.max_speed = float(max_speed)
         self.grid_cell_size = float(grid_cell_size)
+        self.target_separation = float(
+            target_separation
+            if target_separation is not None
+            else 2.0 * self.collision_radius
+        )
+        self.coverage_weight = float(coverage_weight)
+        self.separation_weight = float(separation_weight)
+        self.collision_penalty = float(collision_penalty)
+        if self.target_separation <= 0.0:
+            raise ValueError("target_separation must be positive")
+        if self.coverage_weight < 0.0 or self.separation_weight < 0.0:
+            raise ValueError("reward weights must be non-negative")
+        if self.collision_penalty <= 0.0:
+            raise ValueError("collision_penalty must be positive")
         self.render_mode = render_mode
 
         # own position(3) + own velocity(3) + k nearest-neighbor distances + 6 wall distances
@@ -167,13 +185,25 @@ class SwarmEnv(ParallelEnv):
         # 2) Collision detection (pairwise distance < collision_radius).
         collided_agents = self._detect_collisions()
 
-        # 3) Rewards: exploration bonus + collision penalty.
+        # 3) Balance coverage novelty and safe separation against collisions.
         rewards = {}
+        reward_components = {}
         for agent in self.agents:
-            reward = self._exploration_reward(agent)
-            if agent in collided_agents:
-                reward -= 100.0
-            rewards[agent] = float(reward)
+            coverage_component = (
+                self.coverage_weight * self._exploration_reward(agent)
+            )
+            separation_component = self.separation_weight * self._separation_score(agent)
+            collision_component = (
+                -self.collision_penalty if agent in collided_agents else 0.0
+            )
+            reward_components[agent] = {
+                "coverage": float(coverage_component),
+                "separation": float(separation_component),
+                "collision": float(collision_component),
+            }
+            rewards[agent] = float(
+                coverage_component + separation_component + collision_component
+            )
 
         # 4) Termination / truncation bookkeeping.
         self.timestep += 1
@@ -189,6 +219,7 @@ class SwarmEnv(ParallelEnv):
             agent: {
                 "collided": agent in collided_agents,
                 "coverage_cells": len(self.visited_cells),
+                "reward_components": reward_components[agent],
             }
             for agent in self.agents
         }
@@ -281,6 +312,18 @@ class SwarmEnv(ParallelEnv):
 
         self.visited_cells.add(cell)
         return 1.0
+
+    def _separation_score(self, agent: str) -> float:
+        """Return a [0, 1] score based on distance to the nearest other agent."""
+        others = [other for other in self.agents if other != agent]
+        if not others:
+            return 1.0
+
+        nearest_distance = min(
+            np.linalg.norm(self.positions[agent] - self.positions[other])
+            for other in others
+        )
+        return float(np.clip(nearest_distance / self.target_separation, 0.0, 1.0))
 
     # ------------------------------------------------------------------ #
     # Misc PettingZoo API
