@@ -15,8 +15,8 @@ function Drone({ drone }) {
 
       {/* Sensor / LiDAR vision cone */}
       <SensorCone 
-       radius={0.5}
-       height={1}
+       radius={0.7}
+       height={1.4}
        segments={32}
        position={[0, -0.5, 0]}/>
     </group>
