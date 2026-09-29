@@ -2,11 +2,11 @@ function SensorCone({
   radius = 0.5,
   height = 1,
   segments = 32,
-  position = [0, -0.5, 0],
+   position = [0, -0.5, 0],
 }) {
   return (
     <mesh
-      position={position}
+      position={[0, -0.5, 0]}
       rotation={[Math.PI, 0, 0]}
     >
       <coneGeometry args={[radius, height, segments]} />
