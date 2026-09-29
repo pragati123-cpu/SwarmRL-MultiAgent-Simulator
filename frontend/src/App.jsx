@@ -5,10 +5,19 @@ const WS_URL = "ws://localhost:8000/ws/drones";
 
 function Drone({ drone }) {
   return (
-    <mesh position={[drone.x, drone.y, drone.z]}>
-      <sphereGeometry args={[0.2, 16, 16]} />
-      <meshStandardMaterial color="cyan" />
-    </mesh>
+    <group position={[drone.x, drone.y, drone.z]}>
+      {/* Drone body */}
+      <mesh>
+        <sphereGeometry args={[0.2, 16, 16]} />
+        <meshStandardMaterial color="cyan" />
+      </mesh>
+
+      {/* Sensor / LiDAR vision cone */}
+      <mesh position={[0, -0.5, 0]}>
+        <coneGeometry args={[0.5, 1, 32]} />
+        <meshStandardMaterial color="yellow" />
+      </mesh>
+    </group>
   );
 }
 
