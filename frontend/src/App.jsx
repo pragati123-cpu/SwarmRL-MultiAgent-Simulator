@@ -14,7 +14,10 @@ function Drone({ drone }) {
       </mesh>
 
       {/* Sensor / LiDAR vision cone */}
-      <SensorCone />
+      <SensorCone 
+       radius={0.5}
+       height={1}
+       segments={32}/>
     </group>
   );
 }
