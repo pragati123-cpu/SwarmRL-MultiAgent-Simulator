@@ -3,6 +3,9 @@
 SwarmRL is a PettingZoo-based multi-drone environment with a Python simulation
 backend and a React/Three.js frontend.
 
+The repository contains both backend simulation code and a separate frontend
+application, so each can be developed and tested independently.
+
 ## Backend setup
 
 From the repository root:
