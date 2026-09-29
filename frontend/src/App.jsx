@@ -17,7 +17,8 @@ function Drone({ drone }) {
       <SensorCone 
        radius={0.5}
        height={1}
-       segments={32}/>
+       segments={32}
+       position={[0, -0.5, 0]}/>
     </group>
   );
 }
