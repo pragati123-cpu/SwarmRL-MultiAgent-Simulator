@@ -86,7 +86,7 @@ function App() {
           position={[5, 10, 5]}
           intensity={1}
         />
-
+        {/* Render each drone with its attached sensor cone */}
         {drones.map((drone, index) => (
           <Drone
             key={drone.id ?? index}
