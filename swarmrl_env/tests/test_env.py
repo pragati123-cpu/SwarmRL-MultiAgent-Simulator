@@ -134,7 +134,11 @@ def test_collision_triggers_large_negative_reward():
     _, rewards, _, _, infos = env.step(actions)
 
     assert all(infos[agent]["collided"] for agent in env.possible_agents)
-    assert all(rewards[agent] <= -99.0 for agent in env.possible_agents)
+    assert all(rewards[agent] <= -8.5 for agent in env.possible_agents)
+    assert all(
+        infos[agent]["reward_components"]["collision"] == -10.0
+        for agent in env.possible_agents
+    )
 
 
 def test_exploration_reward_given_once_per_cell():
@@ -173,9 +177,50 @@ def test_exploration_reward_is_one_for_a_new_cell():
         first_agent: np.array([1.0, 0.0, 0.0], dtype=np.float32),
         second_agent: np.zeros(3, dtype=np.float32),
     }
-    _, rewards, _, _, _ = env.step(actions)
+    _, rewards, _, _, infos = env.step(actions)
 
-    assert rewards[first_agent] == 1.0
+    assert infos[first_agent]["reward_components"]["coverage"] == 1.0
+    assert rewards[first_agent] >= 1.0
+
+
+def test_separation_reward_increases_with_nearest_neighbor_distance():
+    env = make_env(
+        n_agents=2,
+        collision_radius=1.0,
+        target_separation=4.0,
+        max_speed=0.0,
+    )
+    env.reset(seed=9)
+    first_agent, second_agent = env.agents
+    actions = {agent: np.zeros(3, dtype=np.float32) for agent in env.agents}
+
+    env.positions[first_agent] = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+    env.positions[second_agent] = np.array([2.0, 0.0, 0.0], dtype=np.float32)
+    env.visited_cells = {
+        env._position_to_cell(env.positions[first_agent]),
+        env._position_to_cell(env.positions[second_agent]),
+    }
+    _, near_rewards, _, _, near_infos = env.step(actions)
+
+    env.positions[second_agent] = np.array([4.0, 0.0, 0.0], dtype=np.float32)
+    _, far_rewards, _, _, far_infos = env.step(actions)
+
+    assert near_infos[first_agent]["reward_components"]["separation"] == 0.25
+    assert far_infos[first_agent]["reward_components"]["separation"] == 0.5
+    assert far_rewards[first_agent] > near_rewards[first_agent]
+
+
+def test_total_reward_is_sum_of_reported_components():
+    env = make_env()
+    env.reset(seed=17)
+    actions = random_actions(env)
+
+    _, rewards, _, _, infos = env.step(actions)
+
+    for agent in env.agents:
+        assert rewards[agent] == pytest.approx(
+            sum(infos[agent]["reward_components"].values())
+        )
 
 
 def test_step_after_episode_end_is_safe_noop():

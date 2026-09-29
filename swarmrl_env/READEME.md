@@ -87,13 +87,20 @@ later if the swarm size grows).
 
 ### Reward
 
-- `+1` the **first** time an agent enters a previously-unvisited cell of a
-  coarse coverage grid (`grid_cell_size`, default 5.0 world units) —
-  implements the brief's "reward agents for exploring unvisited
-  coordinates (+1)".
-- `-100` for every step an agent is within `collision_radius` of another
-  agent — implements "heavily penalize them for colliding with each other
-  (-100)".
+The total reward is the sum of three reported components:
+
+| Component | Default behavior |
+|-----------|------------------|
+| Coverage | `+1.0` on the first visit to a cell; `grid_cell_size` sets the resolution. Spawn cells are marked visited at reset. |
+| Separation | Up to `+0.5`, increasing linearly with distance to the nearest other agent and capped at `target_separation` (default: twice `collision_radius`). |
+| Collision | `-10.0` whenever an agent is within `collision_radius` of another agent. |
+
+The maximum positive reward is `+1.5`, so a collision remains decisively worse
+than exploration or spacing gains. Configure the balance with
+`coverage_weight`, `separation_weight`, and `collision_penalty`; configure the
+spacing target with `target_separation`. Per-agent
+`infos[agent]["reward_components"]` exposes the `coverage`, `separation`, and
+`collision` terms for monitoring and debugging.
 
 ### Episode termination
 
