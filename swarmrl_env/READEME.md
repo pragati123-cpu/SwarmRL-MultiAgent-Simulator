@@ -1,146 +1,70 @@
-# SwarmRL - Environment Reset, Step, and Reward Logic
+# SwarmRL Backend: Environment and MAPPO
 
-**Project:** SwarmRL — Multi-Agent Deep Reinforcement Learning Simulator
-**Track:** Reinforcement Learning (Ray RLlib, PyTorch)
-**This deliverable's scope:** `Environment Reset & Step Logic (Python/PettingZoo)` —
-standard `reset()` and `step()` handlers for the multi-agent environment loop,
-including observation, collision, and exploration-reward behavior.
-
-This repo implements the piece of Week 1 ("Environment Physics") assigned to
-this task: a working `reset()`/`step()` loop for the custom PettingZoo
-environment, including the continuous action space (throttle / pitch / yaw),
-the sorted distances to nearest neighbors observation, boundary clipping, collision
-detection, and the coverage-based reward. It does **not** cover the
-Three.js/WebSocket rendering track (that's the parallel "Simulation &
-Rendering" column for Week 1) or the RLlib training loop (Week 3) — those are
-separate teammates' deliverables that will import this environment.
-
----
-
-## Folder structure
-
-```
-swarmrl_env/
-├── READEME.md
-├── requirements.txt
-├── demo.py                    # random-action rollout smoke test
-├── swarm_env/
-│   ├── __init__.py            # exposes SwarmEnv + parallel_env()/env() factory
-│   └── environment.py         # SwarmEnv: reset(), step(), obs/reward/collision logic
-└── tests/
-    └── test_env.py            # pytest suite for reset()/step() correctness
-```
+This package contains the PettingZoo parallel environment and the PyTorch
+MAPPO policy stack used to train it. The environment models multi-drone
+exploration, separation, collision avoidance, and bounded 3D flight.
 
 ## Setup
 
-```bash
-python -m venv .venv && source .venv/bin/activate   # optional
-pip install -r requirements.txt
-```
-
-## Try it
+From the repository root:
 
 ```bash
-python demo.py              # random rollout, prints per-step stats
-python -m pytest tests/ -v  # correctness tests (10 tests)
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r swarmrl_env/requirements.txt
 ```
 
-The test suite covers reset determinism, bounded positions, observation-space
-validity, collision penalties, exploration rewards, episode truncation, and
-safe stepping after an episode ends.
+Run the random environment demo with:
 
----
+```bash
+PYTHONPATH=swarmrl_env .venv/Scripts/python.exe swarmrl_env/demo.py
+```
 
-## What `SwarmEnv` implements
+Run environment tests with:
 
-`swarm_env/environment.py` defines `SwarmEnv(ParallelEnv)`, a PettingZoo
-**Parallel API** environment (all agents act simultaneously each step — this
-is the API RLlib's multi-agent trainers expect, and what the Ray RLlib track
-will consume in Week 3).
+```bash
+PYTHONPATH=swarmrl_env .venv/Scripts/python.exe -m pytest -q swarmrl_env/tests/test_env.py
+```
 
-### Action space - per agent, `Box(low=-1, high=1, shape=(3,))`
+Run the policy and integration tests with:
 
-| Index | Meaning       | Mapped range              |
-|-------|---------------|----------------------------|
-| 0     | throttle      | `[0, max_speed]`           |
-| 1     | pitch command | `[-π/2, π/2]`               |
-| 2     | yaw command   | `[-π, π]`                   |
+```bash
+.venv/Scripts/python.exe -m pytest -q swarmrl_env/tests/test_actor.py swarmrl_env/tests/test_critic.py swarmrl_env/tests/test_training.py swarmrl_env/tests/test_trainer.py
+```
 
-`step()` converts `(throttle, pitch, yaw)` into a 3D velocity vector via the
-standard spherical→cartesian conversion, then integrates position by one
-step and clips it to the world's bounding box.
+## Package layout
 
-### Observation space - per agent, `Box(shape=(6 + k + 6,))`
+```text
+swarmrl_env/
+├── requirements.txt
+├── demo.py
+├── policies/
+│   ├── actor.py       # local Gaussian actor and action mapping
+│   ├── critic.py      # centralized value function
+│   ├── rollout.py     # trajectory storage and GAE
+│   ├── updater.py     # clipped PPO update
+│   └── trainer.py     # environment rollout/update integration
+├── swarm_env/
+│   ├── __init__.py
+│   └── environment.py
+└── tests/
+    ├── test_env.py
+    ├── test_actor.py
+    ├── test_critic.py
+    ├── test_training.py
+    └── test_trainer.py
+```
 
-For `n_neighbors=k` (default 5):
+## Environment contract
 
-| Segment                    | Size | Contents                                         |
-|-----------------------------|------|---------------------------------------------------|
-| Own position (normalized)  | 3    | position / half world-size                        |
-| Own velocity (normalized)  | 3    | velocity / max_speed                               |
-| Nearest-neighbor distances | k    | sorted distances to the k closest other agents    |
-| Wall distances             | 6    | normalized distance to each of the 6 bounding walls|
-
-Nearest neighbors are recomputed each step by brute-force pairwise distance
-(fine for the target swarm size of ~50 agents; easy to swap for a KD-tree
-later if the swarm size grows).
-
-### Reward
-
-The total reward is the sum of three reported components:
-
-| Component | Default behavior |
-|-----------|------------------|
-| Coverage | `+1.0` on the first visit to a cell; `grid_cell_size` sets the resolution. Spawn cells are marked visited at reset. |
-| Separation | Up to `+0.5`, increasing linearly with distance to the nearest other agent and capped at `target_separation` (default: twice `collision_radius`). |
-| Collision | `-10.0` whenever an agent is within `collision_radius` of another agent. |
-
-The maximum positive reward is `+1.5`, so a collision remains decisively worse
-than exploration or spacing gains. Configure the balance with
-`coverage_weight`, `separation_weight`, and `collision_penalty`; configure the
-spacing target with `target_separation`. Per-agent
-`infos[agent]["reward_components"]` exposes the `coverage`, `separation`, and
-`collision` terms for monitoring and debugging.
-
-### Episode termination
-
-- `truncations[agent] = True` for all agents once `max_episode_steps` is
-  reached (time-limit truncation, not a "failure").
-- `terminations` is currently always `False` — positions are hard-clipped
-  to the world bounds rather than treated as a fatal out-of-bounds event.
-  This is intentionally left as a hook: a "fly out of bounds = terminate"
-  rule can be added here later (e.g. for the Week 4 curriculum-learning
-  step) without touching the rest of the loop.
-- Per PettingZoo convention, `self.agents` is cleared once the episode
-  ends, and `step()` is a safe no-op (returns empty dicts) if called again
-  after that.
-
-### Reset behavior (`reset(seed=None, options=None)`)
-
-- Re-seeds the environment's RNG if `seed` is given (fully deterministic
-  given the same seed — covered by a test).
-- Spawns all agents at random positions within a configurable central
-  fraction of the world (`options={"spawn_fraction": 0.5}` by default) so
-  the swarm starts clustered rather than at the walls.
-- Zeroes all velocities.
-- Marks each agent's spawn cell as already "visited" so the first step
-  doesn't hand out a free exploration reward just for existing.
-- Returns `(observations, infos)` exactly matching the PettingZoo Parallel
-  API contract.
-
----
-
-## Interface contract for teammates
-
-This is the surface other tracks should build against:
+`SwarmEnv` implements the PettingZoo `ParallelEnv` API:
 
 ```python
-from swarm_env import SwarmEnv
+from swarmrl_env.swarm_env import SwarmEnv
 
 env = SwarmEnv(
-    n_agents=50,          # swarm size
-    n_neighbors=5,         # observed nearest neighbors
-    world_size=100.0,      # cubic world side length
+    n_agents=50,
+    n_neighbors=5,
+    world_size=100.0,
     max_episode_steps=500,
     collision_radius=1.5,
     max_speed=2.0,
@@ -148,29 +72,65 @@ env = SwarmEnv(
 )
 
 observations, infos = env.reset(seed=0)
-# observations: dict[agent_id -> np.ndarray shape=(obs_dim,)]
-
 actions = {agent: env.action_space(agent).sample() for agent in env.agents}
 observations, rewards, terminations, truncations, infos = env.step(actions)
-# rewards: dict[agent_id -> float]
-# infos[agent_id]["collided"]: bool
-# infos[agent_id]["coverage_cells"]: int (running total unique cells visited)
 ```
 
-- **RLlib / MAPPO track (Week 3):** wrap with
-  `ray.rllib.env.wrappers.pettingzoo_env.ParallelPettingZooEnv(SwarmEnv(...))`
-  or register via `pettingzoo.utils.conversions` as needed — the
-  `reset`/`step` signatures here already match what those wrappers expect.
-- **WebSocket / Three.js dashboard track:** the per-step source of truth
-  for drone positions is `env.positions` (`dict[agent_id -> np.ndarray(3,)]`),
-  and `infos[agent]["coverage_cells"]` / `["collided"]` are the two live
-  metrics called out in the Week 1 brief ("push the exact X, Y, Z
-  coordinates of all agents in the environment every step").
+For `n_neighbors=k`, each local observation has shape `(12 + k,)`:
 
-## Notes / things intentionally left for later weeks
+| Segment | Size | Contents |
+| --- | ---: | --- |
+| Position | 3 | Position normalized by half the world size |
+| Velocity | 3 | Velocity normalized by `max_speed` |
+| Neighbors | `k` | Sorted nearest-neighbor distances |
+| Walls | 6 | Normalized distances to the six world boundaries |
 
-- No dynamic obstacles or wind resistance yet (Week 4: curriculum learning).
-- No centralized-critic / MAPPO logic here — this environment only defines
-  the world; the learning algorithm is a separate track.
-- Nearest-neighbor lookup is brute-force `O(n²)`; acceptable at `n≈50` but
-  flagged here in case the swarm size grows significantly.
+Each action is a `Box(-1, 1, shape=(3,))`:
+
+| Index | Command | Physical mapping |
+| ---: | --- | --- |
+| 0 | Throttle | `[0, max_speed]` |
+| 1 | Pitch | `[-pi/2, pi/2]` |
+| 2 | Yaw | `[-pi, pi]` |
+
+The environment converts the commands to a 3D velocity, integrates position
+for one step, and clips the position to the cubic world bounds. Rewards report
+coverage novelty, separation, and collision penalty components in `infos`.
+
+## MAPPO policy stack
+
+`ActorPolicy` is shared across drones. It consumes one local observation per
+row and returns a tanh-bounded action plus its PPO log probability. Its
+`map_action_to_controls()` helper exposes throttle, pitch, and yaw in physical
+units.
+
+`CentralizedCritic` consumes the full swarm observation tensor with shape
+`(..., n_agents, observation_dim)` and returns one shared value estimate per
+leading batch item.
+
+`RolloutBuffer` stores synchronized per-agent transitions, computes generalized
+advantage estimates, and produces flattened `RolloutBatch` objects. The
+`MAPPOUpdater` applies the clipped PPO objective to the shared actor and value
+critic. `MAPPOTrainer` connects these components to `SwarmEnv`:
+
+```python
+from swarmrl_env.policies import MAPPOTrainer
+
+trainer = MAPPOTrainer(env, rollout_length=128)
+metrics = trainer.train_iteration(seed=0)
+```
+
+`train_iteration()` collects one rollout, computes returns and advantages, runs
+one optimizer update, and returns actor loss, critic loss, entropy, approximate
+KL, clip fraction, and rollout step metrics.
+
+## Reward and episode behavior
+
+- Coverage gives a positive reward the first time an agent enters a grid cell.
+- Separation increases with distance to the nearest other agent up to
+  `target_separation`.
+- Collisions apply `collision_penalty` to each involved agent.
+- Episodes truncate at `max_episode_steps`; positions are clipped rather than
+  treated as fatal out-of-bounds terminations.
+- After an episode ends, `step({})` returns empty dictionaries as required by
+  the PettingZoo parallel API.
