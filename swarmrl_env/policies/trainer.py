@@ -22,9 +22,12 @@ class MAPPOTrainer:
         hidden_dim: int = 128,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
+        update_epochs: int = 1,
     ) -> None:
         if rollout_length <= 0:
             raise ValueError("rollout_length must be positive")
+        if update_epochs <= 0:
+            raise ValueError("update_epochs must be positive")
         if not 0.0 <= gamma <= 1.0 or not 0.0 <= gae_lambda <= 1.0:
             raise ValueError("gamma and gae_lambda must be between 0 and 1")
 
@@ -32,6 +35,7 @@ class MAPPOTrainer:
         self.rollout_length = rollout_length
         self.gamma = gamma
         self.gae_lambda = gae_lambda
+        self.update_epochs = update_epochs
         self.agents = list(env.possible_agents)
         observation_dim = env.observation_space(self.agents[0]).shape[0]
         action_dim = env.action_space(self.agents[0]).shape[0]
@@ -88,7 +92,7 @@ class MAPPOTrainer:
             gamma=self.gamma,
             gae_lambda=self.gae_lambda,
         )
-        metrics = self.updater.update(buffer.batch())
+        metrics = self.updater.update(buffer.batch(), epochs=self.update_epochs)
         metrics["rollout_steps"] = float(buffer.position)
         return metrics
 
