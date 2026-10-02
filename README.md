@@ -1,27 +1,72 @@
-## Task 4: Drone Sensor Cone
+# SwarmRL Multi-Agent Simulator
 
-Each drone includes a 3D sensor/LiDAR vision cone built using Three.js `ConeGeometry`.
+SwarmRL is a PettingZoo parallel environment for multi-drone exploration and
+collision avoidance. It includes a PyTorch MAPPO implementation that maps
+local drone observations to continuous flight controls and uses a centralized
+critic for swarm-level value estimation.
 
-The sensor cone is attached to each drone so that it follows the drone's position in the 3D scene.
+## Backend setup
 
-### Implementation
+```bash
+python -m venv .venv
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe -m pip install -r swarmrl_env/requirements.txt
+```
 
-- React Three Fiber
-- Three.js `ConeGeometry`
-- Reusable `SensorCone` component
-- Configurable radius, height, and segments
-- Drone-relative sensor positioning
-- Downward-facing sensor cone
-- Sensor cone rendered for every drone
+Run the backend tests from the repository root:
 
-### Frontend Files
+```bash
+PYTHONPATH=swarmrl_env .venv/Scripts/python.exe -m pytest -q swarmrl_env/tests
+```
 
-- `frontend/src/App.jsx` - Renders drones and attaches the sensor cone.
-- `frontend/src/SensorCone.jsx` - Reusable sensor cone component.
+The policy and action-space checks can also be run together:
 
-### Run Locally
+```bash
+.venv/Scripts/python.exe -m pytest -q swarmrl_env/tests/test_actor.py swarmrl_env/tests/test_critic.py swarmrl_env/tests/test_training.py swarmrl_env/tests/test_trainer.py tests/test_action_space.py
+```
+
+## MAPPO components
+
+The policy package is under `swarmrl_env/policies/`:
+
+- `ActorPolicy`: shared tanh-squashed Gaussian actor with PPO log probabilities.
+- `CentralizedCritic`: value function over all agents' observations.
+- `RolloutBuffer`: parallel trajectory storage and GAE return calculation.
+- `MAPPOUpdater`: clipped PPO actor/critic update.
+- `MAPPOTrainer`: real-environment rollout collection and one update iteration.
+
+```python
+from swarmrl_env.swarm_env import SwarmEnv
+from swarmrl_env.policies import MAPPOTrainer
+
+env = SwarmEnv(n_agents=6, n_neighbors=3)
+trainer = MAPPOTrainer(env, rollout_length=128)
+metrics = trainer.train_iteration(seed=0)
+```
+
+## Environment contract
+
+For `n_neighbors=k`, each local observation has shape `(12 + k,)` and contains
+normalized position, normalized velocity, sorted neighbor distances, and six
+normalized wall distances.
+
+Each action is a three-value `Box(-1, 1)`:
+
+| Index | Command | Physical range |
+| --- | --- | --- |
+| 0 | throttle | `[0, max_speed]` |
+| 1 | pitch | `[-pi/2, pi/2]` |
+| 2 | yaw | `[-pi, pi]` |
+
+The environment converts these commands into a 3D velocity, clips positions to
+the world bounds, and reports coverage, separation, and collision rewards.
+
+## Frontend
+
+The React/Three.js dashboard is developed independently:
 
 ```bash
 cd frontend
 npm install
 npm run dev
+```
