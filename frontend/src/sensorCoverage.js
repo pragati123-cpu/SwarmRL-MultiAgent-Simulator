@@ -6,11 +6,11 @@ export function getGroundCoverage(
 ) {
   const cells = [];
 
-  const minX = Math.floor(sensorX - radius);
-  const maxX = Math.floor(sensorX + radius);
+  const minX = Math.floor((sensorX - radius) / cellSize);
+  const maxX = Math.floor((sensorX + radius) / cellSize);
 
-  const minZ = Math.floor(sensorZ - radius);
-  const maxZ = Math.floor(sensorZ + radius);
+  const minZ = Math.floor((sensorZ - radius) / cellSize);
+  const maxZ = Math.floor((sensorZ + radius) / cellSize);
 
   for (let x = minX; x <= maxX; x++) {
     for (let z = minZ; z <= maxZ; z++) {
