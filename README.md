@@ -70,3 +70,9 @@ cd frontend
 npm install
 npm run dev
 ```
+
+Each drone displays a semi-transparent, emissive sensor cone and a ground
+coverage ring. Their low-opacity materials keep the scene beneath them visible,
+while emissive color follows the drone's altitude color. The current scene uses
+a ground grid; the same materials also allow terrain meshes to remain visible
+through the coverage visualization.
