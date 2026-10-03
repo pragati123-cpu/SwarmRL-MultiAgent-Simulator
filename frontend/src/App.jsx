@@ -1,3 +1,4 @@
+import { getGroundCoverage } from "./sensorCoverage";
 import { SensorCone } from './SensorCone';
 import { GroundCoverage } from './GroundCoverage';
 import { useEffect, useState, useRef } from "react";
@@ -13,10 +14,17 @@ function getDroneColor(yPosition) {
 
 function DroneMesh({ position }) {
   const meshRef = useRef();
+
   const xPos = position?.x || 0;
   const yPos = position?.y || position?.z || 0;
   const zPos = position?.z || 0;
+
   const color = getDroneColor(yPos);
+
+  // Detect ground area covered by sensor
+  const coverage = getGroundCoverage(xPos, zPos, 2);
+
+  console.log("Drone coverage:", coverage);
 
   return (
     <group position={[xPos, yPos, zPos]}>
@@ -31,7 +39,7 @@ function DroneMesh({ position }) {
         />
       </mesh>
 
-      {/* Task 6: Sensor Coverage Cone attached to Drone */}
+      {/* Sensor Coverage Cone */}
       <SensorCone 
         position={[xPos, yPos, zPos]} 
         color={color}
