@@ -116,7 +116,7 @@ critic. `MAPPOTrainer` connects these components to `SwarmEnv`:
 ```python
 from swarmrl_env.policies import MAPPOTrainer
 
-trainer = MAPPOTrainer(env, rollout_length=128)
+trainer = MAPPOTrainer(env, rollout_length=128, update_epochs=4)
 metrics = trainer.train_iteration(seed=0)
 ```
 

@@ -40,7 +40,7 @@ from swarmrl_env.swarm_env import SwarmEnv
 from swarmrl_env.policies import MAPPOTrainer
 
 env = SwarmEnv(n_agents=6, n_neighbors=3)
-trainer = MAPPOTrainer(env, rollout_length=128)
+trainer = MAPPOTrainer(env, rollout_length=128, update_epochs=4)
 metrics = trainer.train_iteration(seed=0)
 ```
 
