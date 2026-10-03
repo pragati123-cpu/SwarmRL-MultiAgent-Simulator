@@ -2,6 +2,8 @@ import numpy as np
 from gymnasium import spaces
 from pettingzoo import ParallelEnv
 
+from .dynamic_obstacles import DynamicObstacleManager
+
 
 class SwarmEnv(ParallelEnv):
     """
@@ -24,11 +26,30 @@ class SwarmEnv(ParallelEnv):
         "render_modes": [],
     }
 
-    def __init__(self, num_drones=3, max_cycles=100):
+    def __init__(
+        self,
+        num_drones=3,
+        max_cycles=100,
+        obstacle_count=0,
+        obstacle_bounds=10.0,
+        obstacle_radius=1.0,
+        obstacle_max_speed=1.0,
+        obstacle_dt=1.0,
+    ):
         super().__init__()
 
         self.num_drones = num_drones
         self.max_cycles = max_cycles
+        if obstacle_dt <= 0.0:
+            raise ValueError("obstacle_dt must be positive")
+        self.obstacle_dt = float(obstacle_dt)
+        self.obstacle_manager = DynamicObstacleManager(
+            count=obstacle_count,
+            bounds=obstacle_bounds,
+            radius=obstacle_radius,
+            max_speed=obstacle_max_speed,
+        )
+        self.obstacle_states = np.empty((0, 6), dtype=np.float32)
 
         self.possible_agents = [
             f"drone_{i}" for i in range(num_drones)
@@ -76,6 +97,7 @@ class SwarmEnv(ParallelEnv):
 
         self.agents = self.possible_agents.copy()
         self.step_count = 0
+        self.obstacle_states = self.obstacle_manager.reset(seed=seed)
 
         self.state = {
             agent: np.zeros(9, dtype=np.float32)
@@ -88,7 +110,9 @@ class SwarmEnv(ParallelEnv):
         }
 
         infos = {
-            agent: {}
+            agent: {
+                "obstacle_states": self.obstacle_states.copy(),
+            }
             for agent in self.agents
         }
 
@@ -96,6 +120,7 @@ class SwarmEnv(ParallelEnv):
 
     def step(self, actions):
         self.step_count += 1
+        self.obstacle_states = self.obstacle_manager.step(self.obstacle_dt)
 
         observations = {}
         rewards = {}
@@ -142,6 +167,7 @@ class SwarmEnv(ParallelEnv):
 
             infos[agent] = {
                 "step": self.step_count,
+                "obstacle_states": self.obstacle_states.copy(),
             }
 
         if self.step_count >= self.max_cycles:
