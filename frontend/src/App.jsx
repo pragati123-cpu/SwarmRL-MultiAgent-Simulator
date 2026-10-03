@@ -1,4 +1,5 @@
 import { SensorCone } from './SensorCone';
+import { GroundCoverage } from './GroundCoverage';
 import { useEffect, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -100,8 +101,8 @@ export default function App() {
         <directionalLight position={[10, 20, 15]} intensity={1.2} />
         <OrbitControls makeDefault />
 
-        {/* Cyberpunk Ground Grid */}
-        <gridHelper args={[100, 50, "#00ff88", "#1e293b"]} position={[0, 0, 0]} />
+        {/* Ground Coverage Grid */}
+        <GroundCoverage size={100} divisions={50}/>
 
         {/* Drones + Sensor Coverage Cones */}
         {drones.map((drone, idx) => (
