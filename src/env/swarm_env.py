@@ -35,6 +35,8 @@ class SwarmEnv(ParallelEnv):
         obstacle_radius=1.0,
         obstacle_max_speed=1.0,
         obstacle_dt=1.0,
+        drone_radius=0.5,
+        obstacle_collision_penalty=10.0,
     ):
         super().__init__()
 
@@ -42,7 +44,13 @@ class SwarmEnv(ParallelEnv):
         self.max_cycles = max_cycles
         if obstacle_dt <= 0.0:
             raise ValueError("obstacle_dt must be positive")
+        if drone_radius <= 0.0:
+            raise ValueError("drone_radius must be positive")
+        if obstacle_collision_penalty < 0.0:
+            raise ValueError("obstacle_collision_penalty must be non-negative")
         self.obstacle_dt = float(obstacle_dt)
+        self.drone_radius = float(drone_radius)
+        self.obstacle_collision_penalty = float(obstacle_collision_penalty)
         self.obstacle_manager = DynamicObstacleManager(
             count=obstacle_count,
             bounds=obstacle_bounds,
@@ -58,14 +66,30 @@ class SwarmEnv(ParallelEnv):
         self.agents = self.possible_agents.copy()
 
         # Observation:
-        # x, y, z
-        # vx, vy, vz
-        # roll, pitch, yaw
+        # x, y, z, vx, vy, vz, roll, pitch, yaw,
+        # normalized distance to each configured obstacle.
+        self._observation_dim = 9 + self.obstacle_manager.count
         self.observation_spaces = {
             agent: spaces.Box(
-                low=-np.inf,
-                high=np.inf,
-                shape=(9,),
+                low=np.concatenate(
+                    (
+                        np.full(9, -np.inf, dtype=np.float32),
+                        np.zeros(
+                            self.obstacle_manager.count,
+                            dtype=np.float32,
+                        ),
+                    )
+                ),
+                high=np.concatenate(
+                    (
+                        np.full(9, np.inf, dtype=np.float32),
+                        np.ones(
+                            self.obstacle_manager.count,
+                            dtype=np.float32,
+                        ),
+                    )
+                ),
+                shape=(self._observation_dim,),
                 dtype=np.float32,
             )
             for agent in self.possible_agents
@@ -84,6 +108,49 @@ class SwarmEnv(ParallelEnv):
 
         self.state = None
         self.step_count = 0
+
+    def _get_observation(self, agent):
+        """Return the drone state with normalized obstacle distances."""
+
+        state = self.state[agent]
+        if not self.obstacle_manager.obstacles:
+            return state.copy()
+
+        position = state[:3]
+        obstacle_positions = self.obstacle_states[:, :3]
+        distances = np.linalg.norm(
+            obstacle_positions - position,
+            axis=1,
+        )
+        normalized_distances = np.clip(
+            distances / self.obstacle_manager.bounds,
+            0.0,
+            1.0,
+        ).astype(np.float32)
+        return np.concatenate((state, normalized_distances)).astype(
+            np.float32,
+            copy=False,
+        )
+
+    def _detect_obstacle_collisions(self):
+        """Return agents whose drone sphere intersects an obstacle sphere."""
+
+        if not self.obstacle_manager.obstacles:
+            return set()
+
+        collisions = set()
+        obstacle_positions = self.obstacle_states[:, :3]
+        collision_distance = (
+            self.drone_radius + self.obstacle_manager.radius
+        )
+        for agent in self.agents:
+            distances = np.linalg.norm(
+                obstacle_positions - self.state[agent][:3],
+                axis=1,
+            )
+            if np.any(distances <= collision_distance):
+                collisions.add(agent)
+        return collisions
 
     def observation_space(self, agent):
         return self.observation_spaces[agent]
@@ -105,7 +172,7 @@ class SwarmEnv(ParallelEnv):
         }
 
         observations = {
-            agent: self.state[agent].copy()
+            agent: self._get_observation(agent)
             for agent in self.agents
         }
 
@@ -121,6 +188,7 @@ class SwarmEnv(ParallelEnv):
     def step(self, actions):
         self.step_count += 1
         self.obstacle_states = self.obstacle_manager.step(self.obstacle_dt)
+        collided_agents = self._detect_obstacle_collisions()
 
         observations = {}
         rewards = {}
@@ -155,11 +223,17 @@ class SwarmEnv(ParallelEnv):
             self.state[agent][7] = pitch
             self.state[agent][8] = yaw
 
-            # Simple cooperative reward.
-            # Encourage actions close to zero/stable flight.
-            reward = float(1.0 - np.mean(np.square(action)))
+            # Encourage actions close to zero/stable flight and penalize
+            # intersections with moving obstacles.
+            action_reward = 1.0 - np.mean(np.square(action))
+            collision_penalty = (
+                self.obstacle_collision_penalty
+                if agent in collided_agents
+                else 0.0
+            )
+            reward = float(action_reward - collision_penalty)
 
-            observations[agent] = self.state[agent].copy()
+            observations[agent] = self._get_observation(agent)
             rewards[agent] = reward
 
             terminations[agent] = False
@@ -168,6 +242,11 @@ class SwarmEnv(ParallelEnv):
             infos[agent] = {
                 "step": self.step_count,
                 "obstacle_states": self.obstacle_states.copy(),
+                "obstacle_collision": agent in collided_agents,
+                "reward_components": {
+                    "action": float(action_reward),
+                    "obstacle_collision": float(-collision_penalty),
+                },
             }
 
         if self.step_count >= self.max_cycles:
