@@ -249,6 +249,7 @@ export default function App() {
         <GroundCoverage
           size={100}
           divisions={50}
+          coveredCells={coveredCells}
         />
 
         {/* Drones + Sensor Coverage Cones */}
