@@ -97,28 +97,33 @@ export default function App() {
   );
 
 
-  // Add newly covered cells
   const updateCoveredCells = useCallback(
-    (newCells) => {
+  (newCells) => {
+    setCoveredCells((previousCells) => {
+      let hasNewCells = false;
 
-      setCoveredCells((previousCells) => {
+      const updatedCells = new Set(previousCells);
 
-        const updatedCells = new Set(
-          previousCells
-        );
+      newCells.forEach(({ x, z }) => {
+        const cellKey = `${x},${z}`;
 
-
-        newCells.forEach(({ x, z }) => {
-          updatedCells.add(`${x},${z}`);
-        });
-
-
-        return updatedCells;
+        // Add only if the cell is not already covered
+        if (!updatedCells.has(cellKey)) {
+          updatedCells.add(cellKey);
+          hasNewCells = true;
+        }
       });
 
-    },
-    []
-  );
+      // No new cells -> avoid unnecessary React state update
+      if (!hasNewCells) {
+        return previousCells;
+      }
+
+      return updatedCells;
+    });
+  },
+  []
+);
 
 
 
