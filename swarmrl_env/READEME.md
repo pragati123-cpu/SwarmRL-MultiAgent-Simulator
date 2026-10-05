@@ -4,6 +4,12 @@ This package contains the PettingZoo parallel environment and the PyTorch
 MAPPO policy stack used to train it. The environment models multi-drone
 exploration, separation, collision avoidance, and bounded 3D flight.
 
+> **Environment distinction:** Dynamic-obstacle support is implemented in the
+> root RLlib environment at `src/env/swarm_env.py`. This package contains the
+> separate legacy PyTorch/MAPPO environment at
+> `swarmrl_env/swarm_env/environment.py`; its observation and reward contract
+> remains unchanged.
+
 ## Setup
 
 From the repository root:
@@ -134,3 +140,11 @@ KL, clip fraction, and rollout step metrics.
   treated as fatal out-of-bounds terminations.
 - After an episode ends, `step({})` returns empty dictionaries as required by
   the PettingZoo parallel API.
+
+## Dynamic-obstacle integration
+
+For moving spherical obstacles, use the root environment and its configuration
+documented in the repository
+[`README.md`](../README.md). Its optional obstacle settings include
+`obstacle_count`, `obstacle_bounds`, `obstacle_radius`, `obstacle_max_speed`,
+`obstacle_dt`, `drone_radius`, and `obstacle_collision_penalty`.
