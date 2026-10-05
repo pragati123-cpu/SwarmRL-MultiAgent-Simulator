@@ -1,6 +1,24 @@
-# React + Vite
+# SwarmRL Visualizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React Three Fiber dashboard renders live drone telemetry from the backend
+WebSocket at `ws://localhost:8000/ws/drones`.
+
+## Run the dashboard
+
+```bash
+npm install
+npm run dev
+```
+
+Build and lint checks are available through `npm run build` and `npm run lint`.
+
+## Sensor coverage rendering
+
+`src/SensorCone.jsx` draws an open, double-sided cone from each drone to the
+ground and a ring at the projected coverage boundary. Both use low-opacity,
+emissive standard materials with depth writing disabled. This keeps the grid or
+terrain visible beneath overlapping sensor volumes while matching the drone's
+color. Emissive material provides the glow without a post-processing bloom pass.
 
 Currently, two official plugins are available:
 

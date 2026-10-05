@@ -11,10 +11,13 @@ export function SensorCone({ position = [0, 0, 0], fovRange = 5, color = "#00f0f
       {/* 1. Dynamic Sensor FOV Cone (Drone se Ground tak) */}
       <mesh position={[0, -height / 2, 0]} rotation={[Math.PI, 0, 0]}>
         <coneGeometry args={[radius, height, 32, 1, true]} />
-        <meshBasicMaterial
+        <meshStandardMaterial
           color={color}
-          transparent={true}
-          opacity={0.2}
+          emissive={color}
+          emissiveIntensity={0.8}
+          roughness={0.45}
+          transparent
+          opacity={0.16}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
@@ -23,11 +26,15 @@ export function SensorCone({ position = [0, 0, 0], fovRange = 5, color = "#00f0f
       {/* 2. Ground Coverage Circle Projection */}
       <mesh position={[0, -height + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0, radius, 32]} />
-        <meshBasicMaterial
+        <meshStandardMaterial
           color={color}
-          transparent={true}
-          opacity={0.25}
+          emissive={color}
+          emissiveIntensity={0.65}
+          roughness={0.45}
+          transparent
+          opacity={0.24}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
     </group>

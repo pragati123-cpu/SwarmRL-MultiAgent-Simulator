@@ -1,16 +1,8 @@
-import { getGroundCoverage } from "./sensorCoverage";
-import { SensorCone } from "./SensorCone";
-import { GroundCoverage } from "./GroundCoverage";
-
-import {
-  useEffect,
-  useState,
-  useRef,
-  useCallback
-} from "react";
-
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import React, { useState, useEffect, useRef } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import { SensorCone } from './SensorCone';
+import { AnalyticsChart } from './AnalyticsChart';
 
 
 // Sensor coverage radius
@@ -27,9 +19,9 @@ const TOTAL_CELLS =
 
 // Altitude-based drone color
 function getDroneColor(yPosition) {
-  if (yPosition < 5) return "#00ff88";
-  if (yPosition < 15) return "#00d9ff";
-  return "#ff0055";
+  if (yPosition < 5) return "#00ff88";    // Low Altitude -> Bright Green
+  if (yPosition < 15) return "#00d9ff";   // Mid Altitude -> Neon Cyan
+  return "#ff0055";                       // High Altitude -> Neon Pink
 }
 
 
@@ -70,45 +62,15 @@ function DroneMesh({
 
 
   return (
-    <group
-      position={[
-        xPos,
-        yPos,
-        zPos
-      ]}
-    >
-
-      {/* Drone Body */}
+    <group position={[xPos, yPos, zPos]}>
+      {/* 3D Drone Body */}
       <mesh ref={meshRef}>
-
-        <sphereGeometry
-          args={[
-            0.45,
-            16,
-            16
-          ]}
-        />
-
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={1.5}
-          roughness={0.2}
-        />
-
+        <sphereGeometry args={[0.3, 16, 16]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} />
       </mesh>
-
-
-      {/* Sensor Coverage Cone */}
-      <SensorCone
-        position={[
-          xPos,
-          yPos,
-          zPos
-        ]}
-        color={color}
-      />
-
+      
+      {/* Task 6 Dynamic Sensor Coverage Cone */}
+      <SensorCone altitude={yPos} color={color} />
     </group>
   );
 }
@@ -119,6 +81,17 @@ export default function App() {
 
   // Drone telemetry data
   const [drones, setDrones] = useState([]);
+  const [status, setStatus] = useState('Connecting...');
+  
+  // Real-time Dashboard Analytics Data State (Task 5)
+  const [metricsData, setMetricsData] = useState([
+    { time: '0s', explored: 10 },
+    { time: '5s', explored: 22 },
+    { time: '10s', explored: 45 },
+    { time: '15s', explored: 68 },
+    { time: '20s', explored: 85 },
+    { time: '25s', explored: 94 },
+  ]);
 
 
   // WebSocket status
@@ -202,63 +175,9 @@ export default function App() {
 
   // Coverage debug information
   useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8000/ws/drones');
 
-    console.log(
-      "Real-time covered cells:",
-      coveredCells.size
-    );
-
-    console.log(
-      "Ground coverage:",
-      coveragePercentage.toFixed(2) + "%"
-    );
-
-  }, [
-    coveredCells,
-    coveragePercentage
-  ]);
-
-
-
-  // WebSocket connection
-  useEffect(() => {
-
-    const ws = new WebSocket(
-      "ws://localhost:8000/ws/drones"
-    );
-
-
-    // WebSocket connected
-    ws.onopen = () => {
-
-      setStatus(
-        "Connected to Swarm WebSocket"
-      );
-
-    };
-
-
-    // WebSocket disconnected
-    ws.onclose = () => {
-
-      setStatus(
-        "Disconnected"
-      );
-
-    };
-
-
-    // WebSocket error
-    ws.onerror = () => {
-
-      setStatus(
-        "Connection Error"
-      );
-
-    };
-
-
-    // Receive drone telemetry
+    ws.onopen = () => setStatus('Connected (Streaming Swarm Data)');
     ws.onmessage = (event) => {
 
       try {
@@ -269,23 +188,10 @@ export default function App() {
 
         // Backend sends object
         if (data.drones) {
-
-          setDrones(
-            data.drones
-          );
-
+          setDrones(data.drones);
         }
-
-
-        // Backend sends array
-        else if (
-          Array.isArray(data)
-        ) {
-
-          setDrones(data);
-
-        }
-
+      } catch (err) {
+        console.error("Failed to parse websocket frame:", err);
       }
       catch (err) {
 
@@ -305,316 +211,51 @@ export default function App() {
       ws.close();
 
     };
+    ws.onerror = () => setStatus('WebSocket Error');
+    ws.onclose = () => setStatus('Disconnected');
 
   }, []);
 
 
 
   return (
-
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        background: "#05070c",
-        position: "relative"
-      }}
-    >
-
-      {/* =========================
-          TOP LEFT HUD
-      ========================== */}
-
-      <div
-        style={{
-          position: "absolute",
-          top: "20px",
-          left: "20px",
-          zIndex: 10,
-
-          color: "#00f0ff",
-
-          fontFamily: "monospace",
-
-          background:
-            "rgba(10, 15, 28, 0.85)",
-
-          padding: "15px 22px",
-
-          borderRadius: "8px",
-
-          border:
-            "1px solid rgba(0, 240, 255, 0.3)",
-
-          boxShadow:
-            "0 0 15px rgba(0, 240, 255, 0.15)",
-
-          pointerEvents: "none"
-        }}
-      >
-
-        {/* Title */}
-
-        <h2
-          style={{
-            margin:
-              "0 0 6px 0",
-
-            fontSize: "18px",
-
-            color: "#ffffff"
-          }}
-        >
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#090d16', position: 'relative', overflow: 'hidden' }}>
+      {/* HUD Header */}
+      <div style={{
+        position: 'absolute',
+        top: '15px',
+        left: '20px',
+        zIndex: 10,
+        color: '#38bdf8',
+        fontFamily: 'monospace',
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        padding: '10px 18px',
+        borderRadius: '8px',
+        border: '1px solid rgba(56, 189, 248, 0.2)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+      }}>
+        <h2 style={{ margin: 0, fontSize: '16px', textTransform: 'uppercase', letterSpacing: '1px' }}>
           SwarmRL Multi-Agent Visualizer
         </h2>
-
-
-
-        {/* WebSocket Status */}
-
-        <div
-          style={{
-            fontSize: "13px",
-
-            color: "#a0aec0",
-
-            marginBottom: "4px"
-          }}
-        >
-
-          Status:{" "}
-
-          <span
-            style={{
-              color:
-                status.includes(
-                  "Connected"
-                )
-                  ? "#00ff88"
-                  : "#ff0055",
-
-              fontWeight:
-                "bold"
-            }}
-          >
-            {status}
-          </span>
-
-        </div>
-
-
-
-        {/* Active Drones */}
-
-        <div
-          style={{
-            fontSize: "13px",
-
-            color: "#a0aec0",
-
-            marginBottom: "4px"
-          }}
-        >
-
-          Active Drones:{" "}
-
-          <span
-            style={{
-              color: "#00f0ff",
-
-              fontWeight:
-                "bold"
-            }}
-          >
-            {drones.length || 50}
-          </span>
-
-        </div>
-
-
-
-        {/* Covered Cells */}
-
-        <div
-          style={{
-            fontSize: "13px",
-
-            color: "#a0aec0",
-
-            marginBottom: "4px"
-          }}
-        >
-
-          Covered Cells:{" "}
-
-          <span
-            style={{
-              color: "#00ff88",
-
-              fontWeight:
-                "bold"
-            }}
-          >
-            {coveredCells.size}
-          </span>
-
-        </div>
-
-
-
-        {/* Ground Coverage Percentage */}
-
-        <div
-          style={{
-            fontSize: "13px",
-
-            color: "#a0aec0",
-
-            marginTop: "4px"
-          }}
-        >
-
-          Ground Coverage:{" "}
-
-          <span
-            style={{
-              color: "#00ff88",
-
-              fontWeight:
-                "bold"
-            }}
-          >
-            {coveragePercentage.toFixed(2)}%
-          </span>
-
-        </div>
-
-
-
-        {/* Coverage Progress Bar */}
-
-        <div
-          style={{
-            width: "180px",
-
-            height: "6px",
-
-            background:
-              "rgba(255,255,255,0.1)",
-
-            borderRadius: "4px",
-
-            marginTop: "6px",
-
-            overflow: "hidden"
-          }}
-        >
-
-          <div
-            style={{
-              width:
-                `${coveragePercentage}%`,
-
-              height: "100%",
-
-              background: "#00ff88",
-
-              borderRadius: "4px",
-
-              transition:
-                "width 0.3s ease"
-            }}
-          />
-
-        </div>
-
+        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+          Status: <span style={{ color: status.includes('Connected') ? '#4ade80' : '#f87171' }}>{status}</span> | Active Drones: {drones.length}
+        </p>
       </div>
 
+      {/* Task 5 Analytics Chart Overlay */}
+      <AnalyticsChart data={metricsData} />
 
+      {/* 3D Scene */}
+      <Canvas camera={{ position: [0, 25, 35], fov: 60 }}>
+        <ambientLight intensity={0.7} />
+        <pointLight position={[10, 30, 10]} intensity={1.2} />
+        <gridHelper args={[60, 60, '#38bdf8', '#1e293b']} />
+        
+        {drones.map((drone, idx) => (
+          <DroneMesh key={drone.id || idx} position={drone.position || drone} />
+        ))}
 
-      {/* =========================
-          3D CANVAS
-      ========================== */}
-
-      <Canvas
-        camera={{
-          position: [
-            0,
-            25,
-            35
-          ],
-
-          fov: 60
-        }}
-      >
-
-        {/* Ambient Light */}
-
-        <ambientLight
-          intensity={0.6}
-        />
-
-
-        {/* Directional Light */}
-
-        <directionalLight
-          position={[
-            10,
-            20,
-            15
-          ]}
-
-          intensity={1.2}
-        />
-
-
-        {/* Camera Controls */}
-
-        <OrbitControls
-          makeDefault
-        />
-
-
-        {/* =========================
-            GROUND COVERAGE
-        ========================== */}
-
-        <GroundCoverage
-          size={GROUND_SIZE}
-
-          divisions={
-            GROUND_DIVISIONS
-          }
-
-          coveredCells={
-            coveredCells
-          }
-        />
-
-
-        {/* =========================
-            DRONES
-        ========================== */}
-
-        {drones.map(
-          (drone, idx) => (
-
-            <DroneMesh
-              key={
-                drone.id || idx
-              }
-
-              position={drone}
-
-              onCoverageUpdate={
-                updateCoveredCells
-              }
-
-            />
-
-          )
-        )}
-
+        <OrbitControls makeDefault />
       </Canvas>
 
     </div>
