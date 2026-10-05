@@ -1,0 +1,9 @@
+ray[tune]==2.59.0
+gymnasium
+pettingzoo
+numpy
+pytest
+dm-tree
+fsspec
+pandas
+torch
