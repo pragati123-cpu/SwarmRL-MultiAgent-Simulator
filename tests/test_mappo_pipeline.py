@@ -170,3 +170,24 @@ def test_turbulence_is_repeatable_for_a_seed():
         info_b["drone_0"]["turbulence_acceleration"],
     )
     assert np.any(info_a["drone_0"]["turbulence_acceleration"] != 0.0)
+
+
+def test_disturbance_info_matches_each_drones_velocity_update():
+    env = SwarmEnv(num_drones=2, turbulence_strength=0.4)
+    env.reset(seed=43)
+    actions = {
+        agent: np.zeros(4, dtype=np.float32)
+        for agent in env.agents
+    }
+
+    observations, _, _, _, infos = env.step(actions)
+
+    for agent in env.possible_agents:
+        total_acceleration = (
+            infos[agent]["wind_acceleration"]
+            + infos[agent]["turbulence_acceleration"]
+        )
+        np.testing.assert_allclose(
+            observations[agent][3:6],
+            total_acceleration * env.physics_dt,
+        )

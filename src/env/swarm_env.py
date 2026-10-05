@@ -211,6 +211,7 @@ class SwarmEnv(ParallelEnv):
         truncations = {}
         infos = {}
         action_rewards = {}
+        disturbance_accelerations = {}
 
         for agent in self.agents:
             action = np.asarray(
@@ -242,6 +243,10 @@ class SwarmEnv(ParallelEnv):
             actual_velocity = commanded_velocity + (
                 wind_acceleration + turbulence_acceleration
             ) * self.physics_dt
+            disturbance_accelerations[agent] = (
+                wind_acceleration.copy(),
+                turbulence_acceleration.copy(),
+            )
 
             self.state[agent][:3] += actual_velocity * self.physics_dt
 
@@ -263,6 +268,9 @@ class SwarmEnv(ParallelEnv):
                 else 0.0
             )
             reward = float(action_reward - collision_penalty)
+            wind_acceleration, turbulence_acceleration = (
+                disturbance_accelerations[agent]
+            )
 
             observations[agent] = self._get_observation(agent)
             rewards[agent] = reward
