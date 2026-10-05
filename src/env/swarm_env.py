@@ -37,6 +37,10 @@ class SwarmEnv(ParallelEnv):
         obstacle_dt=1.0,
         drone_radius=0.5,
         obstacle_collision_penalty=10.0,
+        wind_velocity=(0.15, 0.0, 0.0),
+        air_resistance=0.2,
+        turbulence_strength=0.05,
+        physics_dt=0.1,
     ):
         super().__init__()
 
@@ -48,9 +52,23 @@ class SwarmEnv(ParallelEnv):
             raise ValueError("drone_radius must be positive")
         if obstacle_collision_penalty < 0.0:
             raise ValueError("obstacle_collision_penalty must be non-negative")
+        wind_velocity = np.asarray(wind_velocity, dtype=np.float32)
+        if wind_velocity.shape != (3,):
+            raise ValueError("wind_velocity must have shape (3,)")
+        if air_resistance < 0.0:
+            raise ValueError("air_resistance must be non-negative")
+        if turbulence_strength < 0.0:
+            raise ValueError("turbulence_strength must be non-negative")
+        if physics_dt <= 0.0:
+            raise ValueError("physics_dt must be positive")
         self.obstacle_dt = float(obstacle_dt)
         self.drone_radius = float(drone_radius)
         self.obstacle_collision_penalty = float(obstacle_collision_penalty)
+        self.wind_velocity = wind_velocity.copy()
+        self.air_resistance = float(air_resistance)
+        self.turbulence_strength = float(turbulence_strength)
+        self.physics_dt = float(physics_dt)
+        self.np_random = np.random.default_rng()
         self.obstacle_manager = DynamicObstacleManager(
             count=obstacle_count,
             bounds=obstacle_bounds,
@@ -159,9 +177,7 @@ class SwarmEnv(ParallelEnv):
         return self.action_spaces[agent]
 
     def reset(self, seed=None, options=None):
-        if seed is not None:
-            np.random.seed(seed)
-
+        self.np_random = np.random.default_rng(seed)
         self.agents = self.possible_agents.copy()
         self.step_count = 0
         self.obstacle_states = self.obstacle_manager.reset(seed=seed)
@@ -195,6 +211,7 @@ class SwarmEnv(ParallelEnv):
         truncations = {}
         infos = {}
         action_rewards = {}
+        disturbance_accelerations = {}
 
         for agent in self.agents:
             action = np.asarray(
@@ -210,14 +227,30 @@ class SwarmEnv(ParallelEnv):
             yaw = action[2]
             roll = action[3]
 
-            # Simple state update.
-            self.state[agent][0] += velocity * 0.1
-            self.state[agent][1] += pitch * 0.1
-            self.state[agent][2] += roll * 0.1
+            commanded_velocity = np.array(
+                [velocity, pitch, roll],
+                dtype=np.float32,
+            )
+            current_velocity = self.state[agent][3:6]
+            wind_acceleration = self.air_resistance * (
+                self.wind_velocity - current_velocity
+            )
+            turbulence_acceleration = self.np_random.normal(
+                0.0,
+                self.turbulence_strength,
+                size=3,
+            ).astype(np.float32)
+            actual_velocity = commanded_velocity + (
+                wind_acceleration + turbulence_acceleration
+            ) * self.physics_dt
+            disturbance_accelerations[agent] = (
+                wind_acceleration.copy(),
+                turbulence_acceleration.copy(),
+            )
 
-            self.state[agent][3] = velocity
-            self.state[agent][4] = pitch
-            self.state[agent][5] = yaw
+            self.state[agent][:3] += actual_velocity * self.physics_dt
+
+            self.state[agent][3:6] = actual_velocity
 
             self.state[agent][6] = roll
             self.state[agent][7] = pitch
@@ -235,6 +268,9 @@ class SwarmEnv(ParallelEnv):
                 else 0.0
             )
             reward = float(action_reward - collision_penalty)
+            wind_acceleration, turbulence_acceleration = (
+                disturbance_accelerations[agent]
+            )
 
             observations[agent] = self._get_observation(agent)
             rewards[agent] = reward
@@ -246,6 +282,8 @@ class SwarmEnv(ParallelEnv):
                 "step": self.step_count,
                 "obstacle_states": self.obstacle_states.copy(),
                 "obstacle_collision": agent in collided_agents,
+                "wind_acceleration": wind_acceleration.copy(),
+                "turbulence_acceleration": turbulence_acceleration.copy(),
                 "reward_components": {
                     "action": float(action_reward),
                     "obstacle_collision": float(-collision_penalty),

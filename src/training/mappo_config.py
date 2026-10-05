@@ -25,6 +25,13 @@ def env_creator(env_config):
                 "obstacle_collision_penalty",
                 10.0,
             ),
+            wind_velocity=env_config.get(
+                "wind_velocity",
+                (0.15, 0.0, 0.0),
+            ),
+            air_resistance=env_config.get("air_resistance", 0.2),
+            turbulence_strength=env_config.get("turbulence_strength", 0.05),
+            physics_dt=env_config.get("physics_dt", 0.1),
         )
     )
 
@@ -53,6 +60,10 @@ def build_mappo_config(
     obstacle_dt=1.0,
     drone_radius=0.5,
     obstacle_collision_penalty=10.0,
+    wind_velocity=(0.15, 0.0, 0.0),
+    air_resistance=0.2,
+    turbulence_strength=0.05,
+    physics_dt=0.1,
 ):
     register_swarm_env()
 
@@ -71,6 +82,10 @@ def build_mappo_config(
                 "obstacle_dt": obstacle_dt,
                 "drone_radius": drone_radius,
                 "obstacle_collision_penalty": obstacle_collision_penalty,
+                "wind_velocity": wind_velocity,
+                "air_resistance": air_resistance,
+                "turbulence_strength": turbulence_strength,
+                "physics_dt": physics_dt,
             },
         )
 
