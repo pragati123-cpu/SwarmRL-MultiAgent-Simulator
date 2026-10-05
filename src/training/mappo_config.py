@@ -47,6 +47,12 @@ def build_mappo_config(
     num_drones=3,
     num_env_runners=2,
     obstacle_count=0,
+    obstacle_bounds=10.0,
+    obstacle_radius=1.0,
+    obstacle_max_speed=1.0,
+    obstacle_dt=1.0,
+    drone_radius=0.5,
+    obstacle_collision_penalty=10.0,
 ):
     register_swarm_env()
 
@@ -59,6 +65,12 @@ def build_mappo_config(
                 "num_drones": num_drones,
                 "max_cycles": 100,
                 "obstacle_count": obstacle_count,
+                "obstacle_bounds": obstacle_bounds,
+                "obstacle_radius": obstacle_radius,
+                "obstacle_max_speed": obstacle_max_speed,
+                "obstacle_dt": obstacle_dt,
+                "drone_radius": drone_radius,
+                "obstacle_collision_penalty": obstacle_collision_penalty,
             },
         )
 

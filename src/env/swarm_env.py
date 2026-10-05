@@ -23,7 +23,7 @@ class SwarmEnv(ParallelEnv):
 
     metadata = {
         "name": "swarm_env_v0",
-        "render_modes": [],
+        "render_modes": ["state"],
     }
 
     def __init__(
@@ -188,13 +188,13 @@ class SwarmEnv(ParallelEnv):
     def step(self, actions):
         self.step_count += 1
         self.obstacle_states = self.obstacle_manager.step(self.obstacle_dt)
-        collided_agents = self._detect_obstacle_collisions()
 
         observations = {}
         rewards = {}
         terminations = {}
         truncations = {}
         infos = {}
+        action_rewards = {}
 
         for agent in self.agents:
             action = np.asarray(
@@ -222,10 +222,13 @@ class SwarmEnv(ParallelEnv):
             self.state[agent][6] = roll
             self.state[agent][7] = pitch
             self.state[agent][8] = yaw
+            action_rewards[agent] = float(1.0 - np.mean(np.square(action)))
 
+        collided_agents = self._detect_obstacle_collisions()
+        for agent in self.agents:
             # Encourage actions close to zero/stable flight and penalize
             # intersections with moving obstacles.
-            action_reward = 1.0 - np.mean(np.square(action))
+            action_reward = action_rewards[agent]
             collision_penalty = (
                 self.obstacle_collision_penalty
                 if agent in collided_agents
@@ -261,7 +264,23 @@ class SwarmEnv(ParallelEnv):
         )
 
     def render(self):
-        pass
+        """Return a serializable snapshot for visualization clients."""
+
+        return {
+            "step": self.step_count,
+            "drones": {
+                agent: self.state[agent][:3].copy()
+                for agent in self.possible_agents
+            }
+            if self.state is not None
+            else {},
+            "obstacles": self.obstacle_states[:, :3].copy(),
+            "obstacle_radii": np.full(
+                self.obstacle_manager.count,
+                self.obstacle_manager.radius,
+                dtype=np.float32,
+            ),
+        }
 
     def close(self):
         pass

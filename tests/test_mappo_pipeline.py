@@ -102,6 +102,20 @@ def test_obstacle_distance_is_in_observation_and_collision_is_penalized():
     assert rewards[agent] <= -6.0
 
 
+def test_render_returns_drone_and_obstacle_snapshot():
+    env = SwarmEnv(num_drones=2, obstacle_count=2)
+    env.reset(seed=4)
+
+    snapshot = env.render()
+
+    assert snapshot["step"] == 0
+    assert set(snapshot["drones"]) == set(env.possible_agents)
+    assert snapshot["obstacles"].shape == (2, 3)
+    assert snapshot["obstacle_radii"].shape == (2,)
+    snapshot["obstacles"][0, 0] = 999.0
+    assert env.obstacle_states[0, 0] != 999.0
+
+
 def test_dynamic_obstacle_reset_is_seeded():
     env_a = SwarmEnv(num_drones=2, obstacle_count=1)
     env_b = SwarmEnv(num_drones=2, obstacle_count=1)
