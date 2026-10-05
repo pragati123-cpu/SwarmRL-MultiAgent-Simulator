@@ -127,3 +127,46 @@ def test_dynamic_obstacle_reset_is_seeded():
         infos_a["drone_0"]["obstacle_states"],
         infos_b["drone_0"]["obstacle_states"],
     )
+
+
+def test_wind_pushes_drones_and_air_resistance_opposes_motion():
+    env = SwarmEnv(
+        num_drones=1,
+        wind_velocity=(2.0, 0.0, 0.0),
+        air_resistance=0.5,
+        turbulence_strength=0.0,
+        physics_dt=0.1,
+    )
+    env.reset(seed=8)
+
+    actions = {"drone_0": np.zeros(4, dtype=np.float32)}
+    observations, _, _, _, infos = env.step(actions)
+
+    np.testing.assert_allclose(infos["drone_0"]["wind_acceleration"], [1, 0, 0])
+    assert observations["drone_0"][3] > 0.0
+
+    env.state["drone_0"][3:6] = [1.0, 0.0, 0.0]
+    env.air_resistance = 1.0
+    env.wind_velocity[:] = 0.0
+    observations, _, _, _, infos = env.step(actions)
+
+    np.testing.assert_allclose(infos["drone_0"]["wind_acceleration"], [-1, 0, 0])
+    assert observations["drone_0"][3] < 0.0
+
+
+def test_turbulence_is_repeatable_for_a_seed():
+    env_a = SwarmEnv(num_drones=1, turbulence_strength=0.4)
+    env_b = SwarmEnv(num_drones=1, turbulence_strength=0.4)
+    env_a.reset(seed=29)
+    env_b.reset(seed=29)
+    actions = {"drone_0": np.zeros(4, dtype=np.float32)}
+
+    observation_a, _, _, _, info_a = env_a.step(actions)
+    observation_b, _, _, _, info_b = env_b.step(actions)
+
+    np.testing.assert_array_equal(observation_a["drone_0"], observation_b["drone_0"])
+    np.testing.assert_array_equal(
+        info_a["drone_0"]["turbulence_acceleration"],
+        info_b["drone_0"]["turbulence_acceleration"],
+    )
+    assert np.any(info_a["drone_0"]["turbulence_acceleration"] != 0.0)
