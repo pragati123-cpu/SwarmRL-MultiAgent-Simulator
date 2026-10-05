@@ -28,23 +28,46 @@ export function GroundCoverage({
         const [x, z] = cell.split(",").map(Number);
 
         return (
-          <mesh
+          <group
             key={cell}
             position={[
               x * cellSize + cellSize / 2,
-              0.02,
+              0.025,
               z * cellSize + cellSize / 2,
             ]}
-            rotation={[-Math.PI / 2, 0, 0]}
           >
-            <planeGeometry args={[cellSize, cellSize]} />
+            {/* Coverage Surface */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry
+                args={[cellSize * 0.92, cellSize * 0.92]}
+              />
 
-            <meshBasicMaterial
-              color="#00ff00"
-              transparent
-              opacity={0.45}
-            />
-          </mesh>
+              <meshBasicMaterial
+                color="#00ff88"
+                transparent
+                opacity={0.42}
+                depthWrite={false}
+              />
+            </mesh>
+
+            {/* Coverage Border */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry
+                args={[
+                  cellSize * 0.40,
+                  cellSize * 0.44,
+                  4,
+                ]}
+              />
+
+              <meshBasicMaterial
+                color="#00ff88"
+                transparent
+                opacity={0.65}
+                depthWrite={false}
+              />
+            </mesh>
+          </group>
         );
       })}
     </group>
