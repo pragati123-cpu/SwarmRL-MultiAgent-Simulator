@@ -4,19 +4,62 @@ import { OrbitControls } from '@react-three/drei';
 import { SensorCone } from './SensorCone';
 import { AnalyticsChart } from './AnalyticsChart';
 
-// Altitude (height) ke basis par dynamic color
+
+// Sensor coverage radius
+const SENSOR_RADIUS = 2;
+
+
+// Ground grid configuration
+const GROUND_SIZE = 100;
+const GROUND_DIVISIONS = 50;
+
+const TOTAL_CELLS =
+  GROUND_DIVISIONS * GROUND_DIVISIONS;
+
+
+// Altitude-based drone color
 function getDroneColor(yPosition) {
   if (yPosition < 5) return "#00ff88";    // Low Altitude -> Bright Green
   if (yPosition < 15) return "#00d9ff";   // Mid Altitude -> Neon Cyan
   return "#ff0055";                       // High Altitude -> Neon Pink
 }
 
-function DroneMesh({ position }) {
+
+// Drone component
+function DroneMesh({
+  position,
+  onCoverageUpdate
+}) {
+
   const meshRef = useRef();
-  const xPos = position?.x || 0;
-  const yPos = position?.y || position?.z || 0;
-  const zPos = position?.z || 0;
+
+  // Drone coordinates
+  const xPos = position?.x ?? 0;
+  const yPos = position?.y ?? 0;
+  const zPos = position?.z ?? 0;
+
   const color = getDroneColor(yPos);
+
+
+  // Real-time ground coverage detection
+  useEffect(() => {
+
+    const coverage = getGroundCoverage(
+      xPos,
+      zPos,
+      SENSOR_RADIUS
+    );
+
+    if (onCoverageUpdate) {
+      onCoverageUpdate(coverage);
+    }
+
+  }, [
+    xPos,
+    zPos,
+    onCoverageUpdate
+  ]);
+
 
   return (
     <group position={[xPos, yPos, zPos]}>
@@ -32,7 +75,11 @@ function DroneMesh({ position }) {
   );
 }
 
+
+
 export default function App() {
+
+  // Drone telemetry data
   const [drones, setDrones] = useState([]);
   const [status, setStatus] = useState('Connecting...');
   
@@ -46,25 +93,130 @@ export default function App() {
     { time: '25s', explored: 94 },
   ]);
 
+
+  // WebSocket status
+  const [status, setStatus] = useState(
+    "Connecting..."
+  );
+
+
+  // Track covered ground cells
+  const [coveredCells, setCoveredCells] =
+    useState(new Set());
+
+
+  // Calculate real-time coverage percentage
+  const coveragePercentage = Math.min(
+    100,
+    (
+      coveredCells.size /
+      TOTAL_CELLS
+    ) * 100
+  );
+
+
+  // Optimized coverage update
+  const updateCoveredCells = useCallback(
+    (newCells) => {
+
+      setCoveredCells(
+        (previousCells) => {
+
+          let hasNewCells = false;
+
+          const updatedCells =
+            new Set(previousCells);
+
+
+          newCells.forEach(
+            ({ x, z }) => {
+
+              const cellKey =
+                `${x},${z}`;
+
+
+              // Add only cells that are not
+              // already covered
+              if (
+                !updatedCells.has(
+                  cellKey
+                )
+              ) {
+
+                updatedCells.add(
+                  cellKey
+                );
+
+                hasNewCells = true;
+
+              }
+
+            }
+          );
+
+
+          // Avoid unnecessary React
+          // state updates
+          if (!hasNewCells) {
+            return previousCells;
+          }
+
+
+          return updatedCells;
+
+        }
+      );
+
+    },
+    []
+  );
+
+
+
+  // Coverage debug information
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000/ws/drones');
 
     ws.onopen = () => setStatus('Connected (Streaming Swarm Data)');
     ws.onmessage = (event) => {
+
       try {
-        const data = JSON.parse(event.data);
+
+        const data =
+          JSON.parse(event.data);
+
+
+        // Backend sends object
         if (data.drones) {
           setDrones(data.drones);
         }
       } catch (err) {
         console.error("Failed to parse websocket frame:", err);
       }
+      catch (err) {
+
+        console.error(
+          "Telemetry parse error:",
+          err
+        );
+
+      }
+
+    };
+
+
+    // Cleanup WebSocket
+    return () => {
+
+      ws.close();
+
     };
     ws.onerror = () => setStatus('WebSocket Error');
     ws.onclose = () => setStatus('Disconnected');
 
-    return () => ws.close();
   }, []);
+
+
 
   return (
     <div style={{ width: '100vw', height: '100vh', backgroundColor: '#090d16', position: 'relative', overflow: 'hidden' }}>
@@ -105,6 +257,8 @@ export default function App() {
 
         <OrbitControls makeDefault />
       </Canvas>
+
     </div>
+
   );
 }
