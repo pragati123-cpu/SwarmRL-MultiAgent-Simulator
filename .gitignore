@@ -1,10 +1,7 @@
 venv/
 __pycache__/
-.pytest_cache/
-.ray/
-ray_results/
-checkpoints/
-*.log
-.env
-.vscode/
 *.pyc
+.pytest_cache/
+.vscode/
+.idea/
+*.log
